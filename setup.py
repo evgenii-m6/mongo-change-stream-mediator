@@ -5,7 +5,7 @@ packages = setuptools.find_packages(
 )
 
 setuptools.setup(
-    name="pymongo-change-stream-reader",
+    name="mongo-change-stream-mediator",
     description="Read your change stream under deployments, "
                 "database or collection at-least-once and send to kafka",
     author="Evgenii M6",
