@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "mongo-change-stream-mediator"
+version = "0.0.1-alpha"
+description = ""
+authors = ["Evgenii M6 <evgenii.optimal@tutamail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+prometheus-client = ">=0.20.0, <0.21.0"
+pymongo = ">=4.6.0, <5.0.0"
+confluent-kafka = ">=1.9.2, <3.0.0"
+pydantic = ">=2.6.0, <3.0.0"
+psutil = ">=5.9.0, <7.0.0"
+
+[tool.poetry.dev-dependencies]
+mypy = ">1.0.0"
+pytest = ">7.0.0"
+pytest-asyncio = ">0.21.0"
+
+
+[build-system]
+requires = ["poetry-core>=1.5.1"]
+build-backend = "poetry.core.masonry.api"
