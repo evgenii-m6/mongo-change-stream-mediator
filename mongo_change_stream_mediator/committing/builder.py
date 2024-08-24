@@ -39,7 +39,6 @@ def build_commit_process(
         'token_operation_timeout': settings.token_operation_timeout,
         'token_operation_max_retry': settings.token_operation_max_retry,
         'commit_interval': settings.commit_interval,
-        'max_uncommitted_events': settings.max_uncommitted_events,
         'queue_get_timeout': settings.queue_get_timeout,
     }
     process = Process(target=application_context.run_application, kwargs=kwargs)
@@ -60,12 +59,10 @@ def build_commit_worker(
     token_operation_timeout: float,
     token_operation_max_retry: int,
     commit_interval: int,
-    max_uncommitted_events: int,
     queue_get_timeout: float,
 ) -> BaseWorker:
     token_mongo_client = MongoClient(host=token_mongo_uri)
     commit_event_processor = ProcessCommitEvent(
-        max_uncommitted_events=max_uncommitted_events,
         commit_interval=commit_interval,
     )
     token_saver = TokenSaving(

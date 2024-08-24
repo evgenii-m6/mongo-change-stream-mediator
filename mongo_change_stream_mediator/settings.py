@@ -55,7 +55,6 @@ class Settings(BaseModel):
     program_start_timeout: int = 60
     program_graceful_stop_timeout: int = 20
     commit_interval: int = 30
-    max_uncommitted_events: int = 1000
     new_topic_num_partitions: int = 1
     new_topic_replication_factor: int = 1
     new_topic_config: str | None = None
