@@ -18,7 +18,8 @@ class ProducerFlow(BaseAsyncApplication):
         event_handler: ChangeEventHandler,
         thread_pool_executor: ThreadPoolExecutor,
         queue_get_timeout: float = 1,
-        max_internal_queue_size: int = 10000
+        max_internal_queue_size: int = 10000,
+        wait_for_internal_queue: float = 1.0,
     ):
         super().__init__()
         self._loop = asyncio.get_running_loop()
@@ -27,6 +28,7 @@ class ProducerFlow(BaseAsyncApplication):
         self._queue_get_timeout = queue_get_timeout
         self._event_handler = event_handler
         self._max_internal_queue_size = max_internal_queue_size
+        self._wait_for_internal_queue = wait_for_internal_queue
 
     def exit_gracefully(self, signum, frame):
         self._should_run = False
@@ -52,13 +54,12 @@ class ProducerFlow(BaseAsyncApplication):
     async def _get_change_event_and_process(self):
         internal_queue_size = self._event_handler.internal_queue_size()
         if internal_queue_size > self._max_internal_queue_size:
-            wait_interval = 1
             logging.warning(
                 f"Internal queue size limit exceed "
                 f"{internal_queue_size}>{self._max_internal_queue_size}."
-                f"Wait {wait_interval}s."
+                f"Wait {self._wait_for_internal_queue}s."
             )
-            await asyncio.sleep(wait_interval)
+            await asyncio.sleep(self._wait_for_internal_queue)
         else:
             async for event in self._iter_change_event():
                 await self._event_handler.handle(event)
