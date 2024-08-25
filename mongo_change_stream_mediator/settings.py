@@ -1,5 +1,6 @@
 import json
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, field_validator
 
@@ -60,6 +61,7 @@ class Settings(BaseModel):
     new_topic_config: str | None = None
     kafka_prefix: str = ""
     kafka_producer_config: str | None = None
+    aiokafka_producer_config: str | None = None
     kafka_connect_timeout: float = 10.0
 
     @field_validator("pipeline")
@@ -96,6 +98,13 @@ class Settings(BaseModel):
     def kafka_producer_config_dict(self) -> dict[str, str]:
         if self.kafka_producer_config is not None:
             return json.loads(self.kafka_producer_config)
+        else:
+            return {}
+
+    @property
+    def aiokafka_producer_config_dict(self) -> dict[str, Any]:
+        if self.kafka_producer_config is not None:
+            return json.loads(self.aiokafka_producer_config)
         else:
             return {}
 

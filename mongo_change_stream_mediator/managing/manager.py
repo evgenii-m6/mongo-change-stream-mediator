@@ -52,7 +52,7 @@ class Manager:
             i: Queue(maxsize=int(settings.max_queue_size/settings.producers_count))
             for i in range(settings.producers_count)
         }
-        self._commit_queue = Queue(maxsize=settings.max_queue_size*2)
+        self._commit_queue = Queue(maxsize=settings.max_queue_size*4)
         self._response_queue = Queue(maxsize=(settings.producers_count + 2)*100)
         self._request_queues: dict[int, Queue] = {}  # dict[task_id: Queue]
 
