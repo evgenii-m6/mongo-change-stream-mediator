@@ -47,21 +47,21 @@ class ProducerFlow(BaseAsyncApplication):
 
     async def _task(self):
         while self._should_run:
-            internal_queue_size = self._event_handler.internal_queue_size()
-            if internal_queue_size > self._max_internal_queue_size:
-                wait_interval = 1
-                logging.warning(
-                    f"Internal queue size limit exceed "
-                    f"{internal_queue_size}>{self._max_internal_queue_size}."
-                    f"Wait {wait_interval}s."
-                )
-                await asyncio.sleep(wait_interval)
-                continue
             await self._get_change_event_and_process()
 
     async def _get_change_event_and_process(self):
-        async for event in self._iter_change_event():
-            await self._event_handler.handle(event)
+        internal_queue_size = self._event_handler.internal_queue_size()
+        if internal_queue_size > self._max_internal_queue_size:
+            wait_interval = 1
+            logging.warning(
+                f"Internal queue size limit exceed "
+                f"{internal_queue_size}>{self._max_internal_queue_size}."
+                f"Wait {wait_interval}s."
+            )
+            await asyncio.sleep(wait_interval)
+        else:
+            async for event in self._iter_change_event():
+                await self._event_handler.handle(event)
 
     def _producer_queue_get(self):
         try:
