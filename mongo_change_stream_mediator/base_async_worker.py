@@ -76,7 +76,9 @@ class BaseAsyncWorker(ABC):
         logging.info(f"Stop worker {self.worker_name}")
         self._should_run = False
         await self._application.stop()
-        logging.info(f"{self.worker_name} worker stopped")
+        logging.info(f"{self.worker_name} application stopped")
+        self._thread_pool_executor.shutdown(cancel_futures=True)
+        logging.info(f"{self.worker_name} worker stopped. Executor futures cancelled")
 
     async def _task(self):
         await self._application.task()

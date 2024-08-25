@@ -285,6 +285,7 @@ class ChangeEventHandler:
                     f"Error in producing message {message_count}: {ex!r}. "
                     f"Produced={self._produced}, confirmed+1={self._confirmed}"
                 )
+                self.exit_gracefully()
             else:
                 self._put_queue.append(message_count)
                 self._confirmed += 1
