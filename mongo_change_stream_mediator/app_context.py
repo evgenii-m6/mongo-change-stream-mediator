@@ -12,7 +12,7 @@ from .messages import (
     Status,
     encode_message,
 )
-from .models import Statuses
+from .models import Statuses, ProcessData
 
 
 class ServiceApplicationProtocol(Protocol):
@@ -24,6 +24,7 @@ class ServiceApplicationProtocol(Protocol):
 class ApplicationContext:
     build_worker: Callable[..., BaseWorker]
     build_async_worker: Callable[..., Awaitable[BaseAsyncWorker]]
+    process_builder: Callable[..., ProcessData]
 
     def __init__(
         self,

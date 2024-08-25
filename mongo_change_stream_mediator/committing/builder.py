@@ -96,3 +96,4 @@ def build_commit_worker(
 
 class CommitFlowContext(ApplicationContext):
     build_worker = staticmethod(build_commit_worker)
+    process_builder = staticmethod(build_commit_process)

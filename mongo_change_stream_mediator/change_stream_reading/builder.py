@@ -149,3 +149,4 @@ def build_change_stream_reader_worker(
 
 class ChangeStreamReaderContext(ApplicationContext):
     build_worker = staticmethod(build_change_stream_reader_worker)
+    process_builder = staticmethod(build_change_stream_reader_process)

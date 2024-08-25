@@ -40,7 +40,7 @@ def build_producer_process(
         'queue_get_timeout': settings.queue_get_timeout,
         'kafka_connect_timeout': settings.kafka_connect_timeout,
     }
-    process = Process(target=application_context.run_application, kwargs=kwargs)
+    process = Process(target=application_context.run_async_application, kwargs=kwargs)
     return ProcessData(
         task_id=task_id,
         process=process,
@@ -114,3 +114,4 @@ async def build_producer_worker(
 
 class ProducerFlowContext(ApplicationContext):
     build_async_worker = staticmethod(build_producer_worker)
+    process_builder = staticmethod(build_producer_process)

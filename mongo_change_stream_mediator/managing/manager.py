@@ -83,7 +83,7 @@ class Manager:
         result = set()
         for i in range(self._settings.producers_count):
             request_queue = Queue(maxsize=1000)
-            process_data = build_producer_process(
+            process_data = self._producing.process_builder(
                 application_context=self._producing,
                 manager_pid=self._pid,
                 manager_create_time=self._manager_create_time,
@@ -101,7 +101,7 @@ class Manager:
 
     def _build_change_log_reader(self) -> int:
         request_queue = Queue(maxsize=1000)
-        process_data = build_change_stream_reader_process(
+        process_data = self._change_stream_reader.process_builder(
             application_context=self._change_stream_reader,
             manager_pid=self._pid,
             manager_create_time=self._manager_create_time,
@@ -118,7 +118,7 @@ class Manager:
 
     def _build_committer(self) -> int:
         request_queue = Queue(maxsize=1000)
-        process_data = build_commit_process(
+        process_data = self._committing.process_builder(
             application_context=self._committing,
             manager_pid=self._pid,
             manager_create_time=self._manager_create_time,

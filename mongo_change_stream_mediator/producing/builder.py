@@ -1,9 +1,6 @@
 from multiprocessing import Process, Queue
 from typing import Any, Type
 
-from confluent_kafka import Producer as KafkaProducer
-from confluent_kafka.admin import AdminClient
-
 from mongo_change_stream_mediator.app_context import ApplicationContext
 from mongo_change_stream_mediator.base_worker import BaseWorker
 from mongo_change_stream_mediator.models import ProcessData
@@ -121,3 +118,4 @@ def build_producer_worker(
 
 class ProducerFlowContext(ApplicationContext):
     build_worker = staticmethod(build_producer_worker)
+    process_builder = staticmethod(build_producer_process)
