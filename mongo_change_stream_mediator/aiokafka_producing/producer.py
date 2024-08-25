@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from functools import wraps
 from typing import Callable
@@ -132,6 +133,14 @@ class Producer:
             except aiokafka.errors.KafkaTimeoutError as ex:
                 before_flush = len(self._message_accumulator)
                 count += 1
+
+                if before_flush == 0:
+                    logging.warning(
+                        f"Producer's queue task_id={self._task_id} "
+                        f"got timeout error with empty buffer."
+                    )
+                    await asyncio.sleep(self._wait_for_flush)
+                    continue
 
                 wait_count = 0
                 while self._should_run:

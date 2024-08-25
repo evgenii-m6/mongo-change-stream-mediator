@@ -119,8 +119,8 @@ def kafka_client(producer_mock) -> KafkaClient:
 
 @pytest.fixture
 async def kafka_client_started(kafka_client) -> KafkaClient:
+    await kafka_client.start()
     try:
-        await kafka_client.start()
         yield kafka_client
     finally:
         await kafka_client.stop()
