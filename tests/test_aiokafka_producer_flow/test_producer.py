@@ -109,15 +109,15 @@ def on_delivery(err, msg):
 
 
 async def test_start_stop(producer_not_started, kafka_client):
-    kafka_client.start.assert_not_called()
+    kafka_client.start.assert_not_awaited()
     await producer_not_started.start()
-    kafka_client.start.assert_called_once()
+    kafka_client.start.assert_awaited_once()
     await producer_not_started.start()
     assert len(kafka_client.start.call_args_list) == 2
 
-    kafka_client.stop.assert_not_called()
+    kafka_client.stop.assert_not_awaited()
     await producer_not_started.stop()
-    kafka_client.stop.assert_called_once()
+    kafka_client.stop.assert_awaited_once()
     await producer_not_started.stop()
     assert len(kafka_client.stop.call_args_list) == 2
 
@@ -125,10 +125,10 @@ async def test_start_stop(producer_not_started, kafka_client):
 async def test_exit_gracefully(producer, kafka_client):
     producer.exit_gracefully()
     assert not producer._should_run
-    kafka_client.stop.assert_not_called()
+    kafka_client.stop.assert_not_awaited()
 
 
-async def test_methods_when_start_didnt_called(producer_not_started, kafka_client):
+async def test_methods_when_start_didnt_awaited(producer_not_started, kafka_client):
     with pytest.raises(ProducerNotRunningError):
         await producer_not_started.produce(
             topic='test', key=b'1', value=b'2', on_delivery=on_delivery
@@ -166,28 +166,28 @@ async def test_handling_errors_in_kafka_client(
         await producer.produce(
             topic='test', key=b'1', value=b'2', on_delivery=on_delivery
         )
-    kafka_client.produce.assert_called_once()
-    kafka_client.produce.assert_called_once_with(
+    kafka_client.produce.assert_awaited_once()
+    kafka_client.produce.assert_awaited_once_with(
         topic='test', key=b'1', value=b'2', on_delivery=on_delivery
     )
 
     kafka_client.start = AsyncMock(side_effect=error)
     with pytest.raises(expected_error) as ex:
         await producer.start()
-    kafka_client.start.assert_called_once()
+    kafka_client.start.assert_awaited_once()
 
     kafka_client.stop = AsyncMock(side_effect=error)
     with pytest.raises(expected_error) as ex:
         await producer.stop()
-    kafka_client.stop.assert_called_once()
+    kafka_client.stop.assert_awaited_once()
 
     kafka_client.stop = AsyncMock()
 
 
 async def test_produce_ok(producer, kafka_client: KafkaClient):
     await producer.produce(topic='test', key=b'1', value=b'2', on_delivery=on_delivery)
-    kafka_client.produce.assert_called_once()
-    kafka_client.produce.assert_called_once_with(
+    kafka_client.produce.assert_awaited_once()
+    kafka_client.produce.assert_awaited_once_with(
         topic='test', key=b'1', value=b'2', on_delivery=on_delivery
     )
 

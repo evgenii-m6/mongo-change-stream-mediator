@@ -9,6 +9,7 @@ from mongo_change_stream_mediator.commit_event_decoder import encode_commit_even
 from mongo_change_stream_mediator.models import DecodedChangeEvent
 from .producer import Producer, ProducerNotRunningError
 from threading import Lock
+import bson
 from ..operations import Operations
 
 
@@ -155,7 +156,10 @@ class ChangeEventHandler:
             topic=topic,
             key=self._get_key_from_event(event),
             value=self._get_value_from_event(event),
-            on_delivery=self._on_message_delivered(event.count),
+            on_delivery=self._on_message_delivered(
+                count=event.count,
+                resume_token=self._get_resume_token(event)
+            ),
             count=event.count,
         )
 
@@ -199,6 +203,12 @@ class ChangeEventHandler:
             self._produced += 1
             self._unconfirmed.add(count)
         logging.debug(f"Produced+1={self._produced}, confirmed={self._confirmed}")
+
+    def _get_resume_token(self, event: DecodedChangeEvent) -> bytes | None:
+        if '_id' in event.bson_document:
+            return bson.encode(event.bson_document['_id'])
+        else:
+            return None
 
     def _validate_event(self, event: DecodedChangeEvent):
         if 'operationType' not in event.bson_document:
@@ -261,7 +271,7 @@ class ChangeEventHandler:
             new_doc['after'] = self._json_encoder(event.bson_document['fullDocument'])
         return self._key_value_encoder(new_doc)
 
-    def _on_message_delivered(self, count: int):
+    def _on_message_delivered(self, count: int, resume_token: bytes | None):
         def wrapped(err, msg):
             if err:
                 logging.error(
@@ -273,7 +283,9 @@ class ChangeEventHandler:
                 )
                 self.exit_gracefully()
             else:
-                message = encode_commit_event(count=count, need_confirm=0, token=None)
+                message = encode_commit_event(
+                    count=count, need_confirm=0, token=resume_token
+                )
                 self._committer_queue.put(message)
                 with self._statistics_lock:
                     self._confirmed += 1

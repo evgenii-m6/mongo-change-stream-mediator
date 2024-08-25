@@ -3,13 +3,15 @@ import logging
 import time
 from collections import deque
 from copy import deepcopy
+from enum import Enum
 from multiprocessing import Queue
 from typing import Callable, Any
 
 from bson import json_util
+import bson
 
 from mongo_change_stream_mediator.commit_event_decoder import encode_commit_event
-from mongo_change_stream_mediator.models import DecodedChangeEvent
+from mongo_change_stream_mediator.models import DecodedChangeEvent, CommitEvent
 from .producer import Producer, ProducerNotRunningError
 from threading import Lock, Thread
 from ..operations import Operations
@@ -83,6 +85,13 @@ def json_string_encoder(doc: dict[str, Any]) -> str:
     )
 
 
+class RedirectThreadStatus(str, Enum):
+    initial = "initial"
+    starting = "starting"
+    running = "running"
+    stopping = "stopping"
+
+
 class ChangeEventHandler:
     _operation_map = deepcopy(Operations)
 
@@ -91,6 +100,8 @@ class ChangeEventHandler:
         producer: Producer,
         committer_queue: Queue,
         kafka_prefix: str = "",
+        put_queue_sleep_time: float = 1,
+        wait_for_topic_created: float = 20.0
     ):
         self._kafka_prefix = kafka_prefix
         self._created_topics: set[str] = set()
@@ -100,15 +111,15 @@ class ChangeEventHandler:
         self._json_encoder = json_string_encoder
         self._should_run = False
 
-        self._statistics_lock = Lock()
         self._produced = 0
         self._unconfirmed = set()
         self._confirmed = 0
 
-        self._put_queue = deque()
-        self._put_queue_sleep_time = 2
-        self._redirect_thread = Thread(target=self.redirect_message, daemon=True)
-        self._redirect_thread_run = False
+        self._put_queue: deque[CommitEvent] = deque()
+        self._put_queue_sleep_time = put_queue_sleep_time
+        self._wait_for_topic_created = wait_for_topic_created
+        self._redirect_thread = Thread(target=self._redirect_messages, daemon=True)
+        self._redirect_thread_status = RedirectThreadStatus.initial
 
     def internal_queue_size(self):
         return len(self._put_queue)
@@ -116,7 +127,11 @@ class ChangeEventHandler:
     async def start(self):
         await self._producer.start()
         await self._update_created_topics()
-        self._redirect_thread.start()
+        if self._redirect_thread_status == RedirectThreadStatus.initial:
+            self._redirect_thread_status = RedirectThreadStatus.starting
+            self._redirect_thread.start()
+        while self._redirect_thread_status != RedirectThreadStatus.running:
+            await asyncio.sleep(0.1)
         self._should_run = True
 
     async def _update_created_topics(self):
@@ -128,13 +143,14 @@ class ChangeEventHandler:
 
     async def stop(self):
         self._should_run = False
+        self._redirect_thread_status = RedirectThreadStatus.stopping
         await self._producer.stop()
-        self.wait_for_redirect_thread_stopped()
+        await self._wait_for_redirect_thread_stopped()
 
     def exit_gracefully(self):
         self._should_run = False
+        self._redirect_thread_status = RedirectThreadStatus.stopping
         self._producer.exit_gracefully()
-        self.wait_for_redirect_thread_stopped()
 
     def log_statistics(self):
         logging.debug(
@@ -169,20 +185,22 @@ class ChangeEventHandler:
             await self._update_created_topics()
 
         while topic not in self._created_topics:
-            wait_period = 20
             logging.warning(
                 f"Topic {topic} does not exist! "
                 f"You should create this topic to continue producing. "
-                f"Wait {wait_period}s."
+                f"Wait {self._wait_for_topic_created}s."
             )
-            await asyncio.sleep(wait_period)
+            await asyncio.sleep(self._wait_for_topic_created)
             await self._update_created_topics()
 
         await self._produce_message(
             topic=topic,
             key=self._get_key_from_event(event),
             value=self._get_value_from_event(event),
-            on_delivery=self._on_message_delivered(event.count),
+            on_delivery=self._on_message_delivered(
+                count=event.count,
+                resume_token=self._get_resume_token(event)
+            ),
             count=event.count,
         )
 
@@ -248,6 +266,12 @@ class ChangeEventHandler:
     def _get_op(self, operation_type: str):
         return self._operation_map[operation_type]
 
+    def _get_resume_token(self, event: DecodedChangeEvent) -> bytes | None:
+        if '_id' in event.bson_document:
+            return bson.encode(event.bson_document['_id'])
+        else:
+            return None
+
     def _get_value_from_event(self, event: DecodedChangeEvent) -> bytes:
         operation = self._get_op(event.bson_document['operationType'])
         new_doc = {'op': operation}
@@ -274,7 +298,9 @@ class ChangeEventHandler:
             new_doc['after'] = self._json_encoder(event.bson_document['fullDocument'])
         return self._key_value_encoder(new_doc)
 
-    def _on_message_delivered(self, count: int) -> Callable[[asyncio.Future], ...]:
+    def _on_message_delivered(
+        self, count: int, resume_token: bytes | None
+    ) -> Callable[[asyncio.Future], ...]:
         message_count = count
 
         def wrapped(future: asyncio.Future):
@@ -287,7 +313,13 @@ class ChangeEventHandler:
                 )
                 self.exit_gracefully()
             else:
-                self._put_queue.append(message_count)
+                self._put_queue.append(
+                    CommitEvent(
+                        count=message_count,
+                        need_confirm=False,
+                        resume_token=resume_token
+                    )
+                )
                 self._confirmed += 1
                 self._unconfirmed.discard(message_count)
                 logging.debug(
@@ -296,27 +328,33 @@ class ChangeEventHandler:
 
         return wrapped
 
-    def redirect_message(self):
-        self._redirect_thread_run = True
-        while self._should_run:
-            if len(self._put_queue) == 0:
-                logging.debug(
-                    f"Put queue is empty. "
-                    f"Sleep {self._put_queue_sleep_time}."
-                )
-                time.sleep(self._put_queue_sleep_time)
-                continue
-            count = self._put_queue.popleft()
-            logging.debug(f"Got from put queue {count}.")
-            message = encode_commit_event(count=count, need_confirm=0, token=None)
-            self._committer_queue.put(message)
-            logging.debug(f"Redirected from put queue {count}.")
+    def _redirect_messages(self):
+        self._redirect_thread_status = RedirectThreadStatus.running
+        while self._redirect_thread_status == RedirectThreadStatus.running:
+            self._redirect_message()
 
-        self._redirect_thread_run = False
-
-    def wait_for_redirect_thread_stopped(self):
-        max_wait_count = 3
-        wait_count = 0
-        while self._redirect_thread_run and wait_count < max_wait_count:
+    def _redirect_message(self):
+        if len(self._put_queue) == 0:
+            logging.debug(
+                f"Put queue is empty. "
+                f"Sleep {self._put_queue_sleep_time}."
+            )
             time.sleep(self._put_queue_sleep_time)
+        else:
+            commit_event = self._put_queue.popleft()
+            logging.debug(f"Got from put queue {commit_event.count}.")
+            message = encode_commit_event(
+                count=commit_event.count,
+                need_confirm=int(commit_event.need_confirm),
+                token=commit_event.resume_token,
+            )
+            self._committer_queue.put(message)
+            logging.debug(f"Redirected from put queue {commit_event.count}.")
+
+    async def _wait_for_redirect_thread_stopped(self):
+        max_wait_count = 5
+        wait_count = 0
+
+        if self._redirect_thread.is_alive() and wait_count < max_wait_count:
+            await asyncio.sleep(self._put_queue_sleep_time)
             wait_count += 1
