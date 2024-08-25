@@ -1,15 +1,3 @@
-import logging.handlers
-
-handler = logging.StreamHandler()
-formatter = logging.Formatter(
-    '%(asctime)s  %(name)s  pid=%(process)d   %(levelname)s   %(message)s'
-)
-handler.setFormatter(formatter)
-logger = logging.getLogger()
-logger.addHandler(handler)
-logger.setLevel("DEBUG")
-
-
 from mongo_change_stream_mediator.managing import build_manager_with_confluent_kafka
 from mongo_change_stream_mediator.managing import build_manager_with_aiokafka
 from mongo_change_stream_mediator.settings import Settings
@@ -18,5 +6,5 @@ from mongo_change_stream_mediator.settings import Settings
 if __name__ == '__main__':
     settings = Settings(
     )
-    manager = build_manager_with_confluent_kafka(settings)
+    manager = build_manager_with_aiokafka(settings)
     manager.run()
