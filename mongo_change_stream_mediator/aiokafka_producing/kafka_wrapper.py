@@ -46,7 +46,6 @@ class KafkaClient:
                     self._kafka_producer.start(),
                     timeout=self._kafka_connect_timeout
                 )
-                await self.list_topics()
             except (asyncio.TimeoutError, asyncio.CancelledError) as ex:
                 raise OperationTimeout(ex)
             else:
