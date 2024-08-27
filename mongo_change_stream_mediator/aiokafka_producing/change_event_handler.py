@@ -156,7 +156,8 @@ class ChangeEventHandler:
         logging.debug(
             f"Produced={self._produced}, "
             f"confirmed={self._confirmed}, "
-            f"unconfirmed={self._unconfirmed}"
+            f"unconfirmed={self._unconfirmed}, "
+            f"internal_queue_size={self.internal_queue_size()}"
         )
 
     async def handle(self, event: DecodedChangeEvent):
@@ -313,6 +314,7 @@ class ChangeEventHandler:
                 )
                 self.exit_gracefully()
             else:
+                logging.debug(f"Message {message_count} is confirmed.")
                 self._put_queue.append(
                     CommitEvent(
                         count=message_count,

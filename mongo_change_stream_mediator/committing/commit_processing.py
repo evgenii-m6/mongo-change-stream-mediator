@@ -59,7 +59,7 @@ class ProcessCommitEvent:
     def _get_committable_events(self) -> CommittableEvents | None:
         confirmed_numbers_with_tokens: list[int] = []
         commit_event_count = self._last_sent_commit_event + 1
-        logging.debug(
+        logging.info(
             f"Start to analyze from {commit_event_count} event."
         )
         while True:
@@ -69,13 +69,16 @@ class ProcessCommitEvent:
                     confirmed_numbers_with_tokens.append(commit_event_count)
                 commit_event_count += 1
             else:
-                logging.debug(
+                logging.info(
                     f"Not found event {commit_event_count} in confirmed_events."
                 )
                 break
 
+        logging.info(
+            f"Found {len(confirmed_numbers_with_tokens)} events to confirm."
+        )
         logging.debug(
-            f"Found next event to confirm: {confirmed_numbers_with_tokens}"
+            f"Found next events to confirm: {confirmed_numbers_with_tokens}"
         )
         if confirmed_numbers_with_tokens:
             last_number = confirmed_numbers_with_tokens[-1]
