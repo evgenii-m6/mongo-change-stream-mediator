@@ -103,7 +103,7 @@ class Settings(BaseModel):
 
     @property
     def aiokafka_producer_config_dict(self) -> dict[str, Any]:
-        if self.kafka_producer_config is not None:
+        if self.aiokafka_producer_config is not None:
             return json.loads(self.aiokafka_producer_config)
         else:
             return {}
